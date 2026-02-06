@@ -4,20 +4,22 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"os/signal"
 )
 
 func main() {
 	ctx := context.Background()
-	if err := run(ctx, os.Stdout, os.Args); err != nil {
+	if err := run(ctx, os.Args, os.Getenv); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n: args: %v", err, os.Args)
 		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context, w io.Writer, args []string) error {
+func run(ctx context.Context, args []string, getenv func(string) string) error {
 	_, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
 
@@ -33,7 +35,46 @@ func run(ctx context.Context, w io.Writer, args []string) error {
 		return fmt.Errorf("flagset failed to parse args: %w", err)
 	}
 
+	if typeName == "" {
+		return fmt.Errorf("--type must be specified")
+	}
+	fileName := getenv("GOFILE")
+	if fileName == "" {
+		return fmt.Errorf("GOFILE is blank")
+	}
+
 	fmt.Println("type: ", typeName)
+	fmt.Println("file: ", fileName)
+
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, fileName, nil, parser.ParseComments)
+	if err != nil {
+		return fmt.Errorf("failed to parse dir: %w", err)
+	}
+
+	ast.Print(fset, file)
+
+	ast.Inspect(file, func(n ast.Node) bool {
+		ts, ok := n.(*ast.TypeSpec)
+		if !ok || ts.Name.Name != typeName {
+			return true
+		}
+
+		fmt.Printf("type spec: %+v\n", ts)
+		st, ok := ts.Type.(*ast.StructType)
+		if !ok {
+			return true
+		}
+
+		fmt.Printf("struct type: %+v\n", st)
+
+		for _, field := range st.Fields.List {
+			for _, name := range field.Names {
+				fmt.Printf("method: %s\n", name.Name)
+			}
+		}
+		return false
+	})
 
 	return nil
 }

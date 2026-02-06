@@ -1,7 +1,6 @@
 package main
 
 import (
-	"testing"
 	"time"
 )
 
@@ -9,7 +8,7 @@ type ExampleInterface interface {
 	Example()
 }
 
-//go:generate go run main.go --type ExampleStruct
+//go:generate go run ../main.go --type ExampleStruct
 type ExampleStruct struct {
 	Field1 string
 	Field2 []string
@@ -18,7 +17,4 @@ type ExampleStruct struct {
 	Field5 *time.Time
 	Field6 map[string]string
 	Field7 chan int
-}
-
-func TestRun(t *testing.T) {
 }
