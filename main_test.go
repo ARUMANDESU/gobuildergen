@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -82,9 +83,10 @@ func TestBuilderBodyTmpl(t *testing.T) {
 			data: TemplateBody{
 				StructName: "Test",
 				Fields: []TemplateStructField{
-					{Name: "TestField1", Type: "string", Default: "\"lol\""},
-					{Name: "TestField2", Type: "string"},
-					{Name: "TestField3", Type: "int", Default: "16"},
+					{Name: "TestField1", FuncName: "TestField1", Type: "string", Default: "\"lol\""},
+					{Name: "TestField2", FuncName: "TestField2", Type: "string"},
+					{Name: "TestField3", FuncName: "TestField3", Type: "int", Default: "16"},
+					{Name: "testField4", FuncName: "TestField4", Type: "string"},
 				},
 			},
 			expected: `
@@ -118,6 +120,10 @@ func (b *TestBuilder) TestField3(v int) *TestBuilder {
     return b
 }
 
+func (b *TestBuilder) TestField4(v string) *TestBuilder {
+    b.val.testField4 = v
+    return b
+}
 
 func (b *TestBuilder) Build() Test {
     return b.val
@@ -133,6 +139,7 @@ func (b *TestBuilder) Build() Test {
 			err := builderBodyTmpl.Execute(&buf, tt.data)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, buf.String())
+			fmt.Println(buf.String())
 		})
 	}
 }

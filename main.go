@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"go/token"
 	"os"
 	"os/signal"
+	"strings"
 	"text/template"
 )
 
@@ -46,12 +48,11 @@ func (b *{{.StructName}}Builder) WithDefault() *{{.StructName}}Builder {
     return b
 }
 {{range .Fields}}
-func (b *{{$.StructName}}Builder) {{.Name}}(v {{.Type}}) *{{$.StructName}}Builder {
+func (b *{{$.StructName}}Builder) {{.FuncName}}(v {{.Type}}) *{{$.StructName}}Builder {
     b.val.{{.Name}} = v
     return b
 }
 {{end}}
-
 func (b *{{.StructName}}Builder) Build() {{.StructName}} {
     return b.val
 }
@@ -68,9 +69,10 @@ type TemplateBody struct {
 }
 
 type TemplateStructField struct {
-	Name    string
-	Type    string
-	Default string
+	Name     string
+	FuncName string
+	Type     string
+	Default  string
 }
 
 func main() {
@@ -105,9 +107,6 @@ func run(ctx context.Context, args []string, getenv func(string) string) error {
 		return fmt.Errorf("GOFILE is blank")
 	}
 
-	fmt.Println("type: ", typeName)
-	fmt.Println("file: ", fileName)
-
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, fileName, nil, parser.ParseComments)
 	if err != nil {
@@ -115,6 +114,8 @@ func run(ctx context.Context, args []string, getenv func(string) string) error {
 	}
 
 	ast.Print(fset, file)
+	headerData := TemplateHeader{Package: file.Name.Name}
+	bodyData := TemplateBody{StructName: typeName}
 
 	ast.Inspect(file, func(n ast.Node) bool {
 		ts, ok := n.(*ast.TypeSpec)
@@ -133,10 +134,30 @@ func run(ctx context.Context, args []string, getenv func(string) string) error {
 		for _, field := range st.Fields.List {
 			for _, name := range field.Names {
 				fmt.Printf("method: %s\n", name.Name)
+				bodyData.Fields = append(bodyData.Fields,
+					TemplateStructField{
+						Name:     name.Name,
+						FuncName: strings.ToUpper(name.Name[:1]) + name.Name[1:],
+						Type:     "TODO",
+						Default:  "TODO",
+					})
+				// TODO: add into headerData.Imports if there is one
 			}
 		}
 		return false
 	})
+
+	var buf bytes.Buffer
+	err = builderHeaderTmpl.Execute(&buf, headerData)
+	if err != nil {
+		return fmt.Errorf("failed to execute header template: %w", err)
+	}
+	err = builderBodyTmpl.Execute(&buf, bodyData)
+	if err != nil {
+		return fmt.Errorf("failed to execute body template: %w", err)
+	}
+
+	fmt.Println(buf.String())
 
 	return nil
 }
