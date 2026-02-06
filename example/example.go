@@ -12,14 +12,15 @@ type ExampleInterface interface {
 
 //go:generate go run ../main.go --type ExampleStruct
 type ExampleStruct struct {
-	Field1  string
+	Field0  string `builder:"default=\"lol\""`
+	Field1  string `builder:"-"`
 	Field2  []string
 	field3  *string
 	field4  time.Time
 	Field5  *time.Time
 	Field6  map[string]string
 	Field7  chan int
-	Field8  ExampleFieldStruct
+	Field8  ExampleFieldStruct `builder:"default=ExampleFieldStruct{}"`
 	Field9  *ExampleFieldStruct
 	Field10 examplepackage.ExampleTest
 	Field11 *examplepackage.ExampleTest
