@@ -8,8 +8,10 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"text/template"
 )
@@ -19,11 +21,11 @@ var builderHeaderTmpl = template.Must(template.New("builder_header").Parse(`
 package {{.Package}}
 
 {{if eq (len .Imports) 1 -}}
-import "{{index .Imports 0}}"
+import {{index .Imports 0}}
 {{else if gt (len .Imports) 1 -}}
 import (
 {{- range .Imports}}
-    "{{.}}"
+    {{.}}
 {{- end}}
 )
 {{end -}}
@@ -117,35 +119,74 @@ func run(ctx context.Context, args []string, getenv func(string) string) error {
 	headerData := TemplateHeader{Package: file.Name.Name}
 	bodyData := TemplateBody{StructName: typeName}
 
+	imports := make(map[string]string)
+	var ts *ast.TypeSpec
 	ast.Inspect(file, func(n ast.Node) bool {
-		ts, ok := n.(*ast.TypeSpec)
-		if !ok || ts.Name.Name != typeName {
-			return true
-		}
+		switch t := n.(type) {
+		case *ast.TypeSpec:
+			if t.Name.Name == typeName {
+				ts = t
+				return false
+			}
+		case *ast.ImportSpec:
+			name, err := strconv.Unquote(t.Path.Value)
+			if err != nil {
+				fmt.Printf("failed to unquote: %s\n", err)
+				return true
+			}
+			path := t.Path.Value
+			if t.Name != nil {
+				name = t.Name.Name
+				path = fmt.Sprintf("%s %s", t.Name.Name, t.Path.Value)
+			}
 
-		fmt.Printf("type spec: %+v\n", ts)
-		st, ok := ts.Type.(*ast.StructType)
+			imports[name] = path
+		}
+		return true
+	})
+
+	if ts == nil {
+		return fmt.Errorf("no such struct type in this file")
+	}
+
+	ast.Inspect(ts, func(n ast.Node) bool {
+		se, ok := n.(*ast.SelectorExpr)
 		if !ok {
 			return true
 		}
 
-		fmt.Printf("struct type: %+v\n", st)
-
-		for _, field := range st.Fields.List {
-			for _, name := range field.Names {
-				fmt.Printf("method: %s\n", name.Name)
-				bodyData.Fields = append(bodyData.Fields,
-					TemplateStructField{
-						Name:     name.Name,
-						FuncName: strings.ToUpper(name.Name[:1]) + name.Name[1:],
-						Type:     "TODO",
-						Default:  "TODO",
-					})
-				// TODO: add into headerData.Imports if there is one
-			}
+		expr := se.X.(*ast.Ident)
+		if val, ok := imports[expr.Name]; ok {
+			headerData.Imports = append(headerData.Imports, val)
+			delete(imports, expr.Name)
 		}
+
 		return false
 	})
+
+	fmt.Printf("type spec: %+v\n", ts)
+	st, ok := ts.Type.(*ast.StructType)
+	if !ok {
+		return fmt.Errorf("type must be struct")
+	}
+
+	fmt.Printf("struct type: %+v\n", st)
+
+	for _, field := range st.Fields.List {
+		for _, name := range field.Names {
+			fmt.Printf("method: %s\n", name.Name)
+			fieldType := types.ExprString(field.Type)
+			bodyData.Fields = append(bodyData.Fields,
+				TemplateStructField{
+					Name:     name.Name,
+					FuncName: strings.ToUpper(name.Name[:1]) + name.Name[1:],
+					Type:     fieldType,
+					Default:  "TODO",
+				})
+		}
+	}
+
+	fmt.Printf("imports: %+v\n", imports)
 
 	var buf bytes.Buffer
 	err = builderHeaderTmpl.Execute(&buf, headerData)
