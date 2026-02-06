@@ -8,17 +8,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBuilderTmpl(t *testing.T) {
+func TestBuilderHeaderTmpl(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name     string
-		data     TemplateData
+		data     TemplateHeader
 		expected string
 	}{
 		{
 			name: "without imports",
-			data: TemplateData{
+			data: TemplateHeader{
 				Package: "test",
 			},
 			expected: `
@@ -29,7 +29,7 @@ package test
 		},
 		{
 			name: "with one import",
-			data: TemplateData{
+			data: TemplateHeader{
 				Package: "test",
 				Imports: []string{"time"},
 			},
@@ -42,7 +42,7 @@ import "time"
 		},
 		{
 			name: "with many imports",
-			data: TemplateData{
+			data: TemplateHeader{
 				Package: "test",
 				Imports: []string{"time", "bytes"},
 			},
@@ -60,8 +60,77 @@ import (
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var buf bytes.Buffer
-			err := builderTmpl.Execute(&buf, tt.data)
+			err := builderHeaderTmpl.Execute(&buf, tt.data)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, buf.String())
+		})
+	}
+}
+
+func TestBuilderBodyTmpl(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		data     TemplateBody
+		expected string
+	}{
+		{
+			name: "test",
+			data: TemplateBody{
+				StructName: "Test",
+				Fields: []TemplateStructField{
+					{Name: "TestField1", Type: "string", Default: "\"lol\""},
+					{Name: "TestField2", Type: "string"},
+					{Name: "TestField3", Type: "int", Default: "16"},
+				},
+			},
+			expected: `
+
+type TestBuilder struct {
+    val Test
+}
+
+func NewTestBuilder() *TestBuilder {
+    return &TestBuilder{}
+}
+
+func (b *TestBuilder) WithDefault() *TestBuilder {
+    b.val.TestField1 = "lol"
+    b.val.TestField3 = 16
+    return b
+}
+
+func (b *TestBuilder) TestField1(v string) *TestBuilder {
+    b.val.TestField1 = v
+    return b
+}
+
+func (b *TestBuilder) TestField2(v string) *TestBuilder {
+    b.val.TestField2 = v
+    return b
+}
+
+func (b *TestBuilder) TestField3(v int) *TestBuilder {
+    b.val.TestField3 = v
+    return b
+}
+
+
+func (b *TestBuilder) Build() Test {
+    return b.val
+}
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var buf bytes.Buffer
+			err := builderBodyTmpl.Execute(&buf, tt.data)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, buf.String())
 		})
