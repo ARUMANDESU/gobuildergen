@@ -222,31 +222,31 @@ func ParseTag(tagBasicLit *ast.BasicLit) (Tag, error) {
 	if err != nil {
 		return Tag{}, err
 	}
-	tags := strings.Split(tag, " ")
-	var keys []string
-	for _, t := range tags {
+
+	var builderValue string
+	for t := range strings.FieldsSeq(tag) {
 		if val, ok := strings.CutPrefix(t, "builder:"); ok {
 			val, err := strconv.Unquote(val)
 			if err != nil {
-				return Tag{}, fmt.Errorf("failed(%d)(%s)(%s): %w", len(tags), t, val, err)
+				return Tag{}, err
 			}
 
-			keys = strings.Split(val, ",")
+			builderValue = val
 		}
 	}
 
 	var t Tag
-	for _, key := range keys {
-		keyval := strings.Split(key, "=")
-		if len(keyval) > 1 {
-			switch keyval[0] {
-			case "default":
-				t.Default = keyval[1]
-			}
-		} else if len(keyval) == 1 {
+	for option := range strings.SplitSeq(builderValue, ",") {
+		option = strings.TrimSpace(option)
+		switch option {
+		case "-":
+			t.Ignore = true
+		}
+
+		if key, value, found := strings.Cut(option, "="); found {
 			switch key {
-			case "-":
-				t.Ignore = true
+			case "default":
+				t.Default = value
 			}
 		}
 	}
