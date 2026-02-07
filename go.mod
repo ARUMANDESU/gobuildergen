@@ -1,4 +1,4 @@
-module githab.com/ARUMANDESU/gobuildergen
+module github.com/ARUMANDESU/gobuildergen
 
 go 1.25.4
 

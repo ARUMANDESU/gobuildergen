@@ -3,7 +3,7 @@ package example
 import (
 	"time"
 
-	examplepackage "githab.com/ARUMANDESU/gobuildergen/example/example-package"
+	examplepackage "github.com/ARUMANDESU/gobuildergen/example/example-package"
 )
 
 type ExampleInterface interface {
