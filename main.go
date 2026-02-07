@@ -88,6 +88,7 @@ func run(ctx context.Context, args []string, getenv func(string) string) error {
 	defer cancel()
 
 	var typeName string
+	var fileName string
 
 	flagset := flag.NewFlagSet("run", flag.ExitOnError)
 
@@ -101,7 +102,7 @@ func run(ctx context.Context, args []string, getenv func(string) string) error {
 	if typeName == "" {
 		return fmt.Errorf("--type must be specified")
 	}
-	fileName := getenv("GOFILE")
+	fileName = getenv("GOFILE")
 	if fileName == "" {
 		return fmt.Errorf("GOFILE is blank")
 	}
